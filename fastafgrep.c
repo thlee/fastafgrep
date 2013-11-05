@@ -8,16 +8,17 @@
 #define MAXLINELEN 65536
 #define PATTERNNUM 4096
 
-const char gsVersion[] = "0.1.8";
+const char gsVersion[] = "0.1.9";
 
 void help(void) {
     printf("Search for PATTERN in each FASTA FILE or standard input.\n");
-    printf("Usage: fastafgrep [-h] [-v] [-c] [-1] -e pattern | -f pattern_file [-i FASTA_file]\n");
+    printf("Usage: fastafgrep [-h] [-v] [-c] [-1] [-E] -e pattern | -f pattern_file [-i FASTA_file]\n");
     printf("\n");
     printf("-v  Select non-matching lines\n");
     printf("-c  Ignore case distinctions\n");
-    printf("-V  print version information and exit\n");
-    printf("-1  Select the 1st matched sequence only\n");
+    printf("-V  Print version information and exit\n");
+    printf("-1  Select the 1st sequence only for each pattern\n");
+    printf("-E  Select sequences that exactly match the entire description\n");
 }
 
 void ver(void) {
@@ -33,6 +34,16 @@ void rtrim(char *sLine) {
     }
 }
 
+char *strstr_entire(const char *desc, const char *pattern) {
+    if (strstr(desc, pattern) == desc && strlen(desc) == strlen(pattern)) return (char *) desc;
+    else return NULL;
+}
+
+char *strcasestr_entire(const char *desc, const char *pattern) {
+    if (strcasestr(desc, pattern) == desc && strlen(desc) == strlen(pattern)) return (char *) desc;
+    else return NULL;
+}
+
 int main(int argc, char *argv[]) {
     char *spFileName = NULL;
     char *spPatternFileName = NULL;
@@ -43,6 +54,8 @@ int main(int argc, char *argv[]) {
     int iMatchNum = 0;
     int iMatchFlag = 0;
     int iInvert = 0;
+    int iEntire = 0;
+    int iIgnoreCase = 0;
     int iOpt;
     int i;
     int iOne = 0;
@@ -55,9 +68,7 @@ int main(int argc, char *argv[]) {
 
     spPatterns = (char **)malloc(sizeof(char *) * PATTERNNUM);
 
-    comp = strstr;
-
-    while((iOpt = getopt(argc, argv, "p:e:f:i:h1vcV")) != -1) {
+    while((iOpt = getopt(argc, argv, "p:e:f:i:h1vcVE")) != -1) {
         switch(iOpt) {
         case 'h':
             help();
@@ -85,8 +96,11 @@ int main(int argc, char *argv[]) {
         case 'v':
             iInvert = 1;
             break;
+        case 'E':
+            iEntire = 1;
+            break;
         case 'c':
-            comp = strcasestr;
+            iIgnoreCase = 2;
             break;
         case 'V':
             ver();
@@ -118,6 +132,25 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    switch ( iEntire + iIgnoreCase ) { /* iEntire: 0 or 1; iIgnoreCase: 0 or 2 */
+    case 0:
+        comp = strstr;
+        break;
+    case 1:
+        comp = strstr_entire;
+        break;
+    case 2:
+        comp = strcasestr;
+        break;
+    case 3:
+        comp = strcasestr_entire;
+        break;
+    default:
+        help();
+        exit(1);
+    } 
+
+    /* Read Patterns */
     if (spPatternFileName != '\0') {
         if (access(spPatternFileName, F_OK) != 0) {
             perror(spPatternFileName);
@@ -139,11 +172,12 @@ int main(int argc, char *argv[]) {
     
     while(fgets(sLine, MAXLINELEN, FSeqFile)) {
         if (sLine[0] == '>') {
+            rtrim(sLine);
             iMatchNum = 0;
             if (iMatchFlag == 1 && iOne == 1 && iInvert == 1) break;
             iMatchFlag = 0;
             for (i = 0; i < iPatternNum; i++) {
-                if (*(spPatterns + i) != NULL && ((*comp)(sLine, *(spPatterns + i)) != NULL)) {
+                if (*(spPatterns + i) != NULL && ((*comp)(sLine+1, *(spPatterns + i)) != NULL)) {
                     iMatchNum++;
                     if (iOne == 1 && iInvert == 0) {
                         free(*(spPatterns + i));
@@ -156,10 +190,12 @@ int main(int argc, char *argv[]) {
             } else {
                 if (iMatchNum == 0)  iMatchFlag = 1;
             }
-        }
-        if (iMatchFlag == 1) {
-            iReturn = 0;
-            printf("%s", sLine);
+            if (iMatchFlag == 1) printf("%s\n", sLine);
+        } else {
+            if (iMatchFlag == 1) {
+                iReturn = 0;
+                printf("%s", sLine);
+            }
         }
     }
 
