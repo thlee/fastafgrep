@@ -1,3 +1,5 @@
+/* Copyright (c) 2011-2015, Tae-Ho Lee(thlee0@korea.kr), All rights reserved. */
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +10,7 @@
 #define MAXLINELEN 65536
 #define PATTERNNUM 4096
 
-const char gsVersion[] = "0.1.9";
+const char gsVersion[] = "0.2.0";
 
 void help(void) {
     printf("Search for PATTERN in each FASTA FILE or standard input.\n");
